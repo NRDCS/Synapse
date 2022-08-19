@@ -30,7 +30,6 @@ class TheHiveConnector:
     def searchCaseByDescription(self, string):
         urlas = self.cfg.get('TheHive', 'url')
         urlas = urlas + "/api/case/_search"
-        print(urlas)
         apikey = self.cfg.get('TheHive', 'api_key')
 
         headers = CaseInsensitiveDict()
