@@ -6,7 +6,9 @@ import json
 
 from thehive4py.api import TheHiveApi
 from thehive4py.models import Case, CaseTask, CaseTaskLog, CaseObservable, AlertArtifact, Alert
-from thehive4py.query import Eq
+from thehive4py.query import Eq,Contains
+from requests.structures import CaseInsensitiveDict
+import requests
 
 class TheHiveConnector:
     'TheHive connector'
@@ -26,17 +28,16 @@ class TheHiveConnector:
         return TheHiveApi(url, api_key)
 
     def searchCaseByDescription(self, string):
-        #search case with a specific string in description
-        #returns the ES case ID
+        urlas = self.cfg.get('TheHive', 'url')
+        urlas = urlas + "/api/case/_search"
+        print(urlas)
+        apikey = self.cfg.get('TheHive', 'api_key')
 
-        self.logger.info('%s.searchCaseByDescription starts', __name__)
+        headers = CaseInsensitiveDict()
+        headers["Content-Type"] = "application/json"
+        headers["Authorization"] = "Bearer " + apikey
 
-        query = dict()
-        query['_string'] = 'description:"{}"'.format(string)
-        range = 'all'
-        sort = []
-        response = self.theHiveApi.find_cases(query=query, range=range, sort=sort)
-
+        response = requests.post(urlas, headers=headers)
         if response.status_code != 200:
             error = dict()
             error['message'] = 'search case failed'
@@ -44,17 +45,12 @@ class TheHiveConnector:
             error['payload'] = response.json()
             self.logger.error('Query to TheHive API did not return 200')
             raise ValueError(json.dumps(error, indent=4, sort_keys=True))
-
-        if len(response.json()) == 1:
-            #one case matched
-            esCaseId = response.json()[0]['id']
-            return esCaseId
-        elif len(response.json()) == 0:
-            #no case matched
-            return None
         else:
-            #unknown use case
-            raise ValueError('unknown use case after searching case by description')
+          esCaseId = None
+          for i in response.json():
+            if i["description"].find(string) != -1:
+              esCaseId = i["_id"]
+              return esCaseId
 
 
     def craftCase(self, title, description):
@@ -92,11 +88,11 @@ class TheHiveConnector:
         return updatedCase
 
     def craftCommTask(self):
+        ownercfg=self.cfg.get('TheHive', 'owner')
         self.logger.info('%s.craftCommTask starts', __name__)
-
         commTask = CaseTask(title='Communication',
             status='InProgress',
-            owner='synapse')
+            owner=ownercfg)
 
         return commTask
 
@@ -104,7 +100,6 @@ class TheHiveConnector:
         self.logger.info('%s.createTask starts', __name__)
 
         response = self.theHiveApi.create_case_task(esCaseId, task)
-
         if response.status_code == 201:
             esCreatedTaskId = response.json()['id']
             return esCreatedTaskId
@@ -164,7 +159,7 @@ class TheHiveConnector:
             esCaseId, file_observable)
 
         if response.status_code == 201:
-            esObservableId = response.json()['id']
+            esObservableId = response.json()[0]['id']
             return esObservableId
         else:
             self.logger.error('File observable upload failed')
