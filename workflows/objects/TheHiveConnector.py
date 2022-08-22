@@ -36,9 +36,7 @@ class TheHiveConnector:
         query = dict()
 
         full_description = '```\nCase created by Synapse\nconversation_id: \"' + string + '\"\n```'
-        query = {"query": { "_field": "description", "_value": full_description }}
-
-        print(query)
+        query = { "_field": "description", "_value": full_description }
 
         range = 'all'
         sort = []
