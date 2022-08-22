@@ -28,15 +28,20 @@ class TheHiveConnector:
         return TheHiveApi(url, api_key)
 
     def searchCaseByDescription(self, string):
-        urlas = self.cfg.get('TheHive', 'url')
-        urlas = urlas + "/api/case/_search"
-        apikey = self.cfg.get('TheHive', 'api_key')
+        #search case with a specific string in description
+        #returns the ES case ID
 
-        headers = CaseInsensitiveDict()
-        headers["Content-Type"] = "application/json"
-        headers["Authorization"] = "Bearer " + apikey
+        self.logger.info('%s.searchCaseByDescription starts', __name__)
 
-        response = requests.post(urlas, headers=headers)
+        query = dict()
+
+        full_description = '```\nCase created by Synapse\nconversation_id: \"' + string + '\"\n```'
+        query = {"query": { "_field": "description", "_value": full_description }}
+        print(query)
+        range = 'all'
+        sort = []
+        response = self.theHiveApi.find_cases(query=query, range=range, sort=sort)
+
         if response.status_code != 200:
             error = dict()
             error['message'] = 'search case failed'
@@ -44,12 +49,17 @@ class TheHiveConnector:
             error['payload'] = response.json()
             self.logger.error('Query to TheHive API did not return 200')
             raise ValueError(json.dumps(error, indent=4, sort_keys=True))
+
+        if len(response.json()) == 1:
+            #one case matched
+            esCaseId = response.json()[0]['id']
+            return esCaseId
+        elif len(response.json()) == 0:
+            #no case matched
+            return None
         else:
-          esCaseId = None
-          for i in response.json():
-            if i["description"].find(string) != -1:
-              esCaseId = i["_id"]
-              return esCaseId
+            #unknown use case
+            raise ValueError('unknown use case after searching case by description')
 
 
     def craftCase(self, title, description):
