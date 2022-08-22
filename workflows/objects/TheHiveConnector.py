@@ -37,7 +37,9 @@ class TheHiveConnector:
 
         full_description = '```\nCase created by Synapse\nconversation_id: \"' + string + '\"\n```'
         query = {"query": { "_field": "description", "_value": full_description }}
+
         print(query)
+
         range = 'all'
         sort = []
         response = self.theHiveApi.find_cases(query=query, range=range, sort=sort)
