@@ -6,7 +6,9 @@ import json
 
 from thehive4py.api import TheHiveApi
 from thehive4py.models import Case, CaseTask, CaseTaskLog, CaseObservable, AlertArtifact, Alert
-from thehive4py.query import Eq
+from thehive4py.query import Eq,Contains
+from requests.structures import CaseInsensitiveDict
+import requests
 
 class TheHiveConnector:
     'TheHive connector'
@@ -32,7 +34,10 @@ class TheHiveConnector:
         self.logger.info('%s.searchCaseByDescription starts', __name__)
 
         query = dict()
-        query['_string'] = 'description:"{}"'.format(string)
+
+        full_description = '```\nCase created by Synapse\nconversation_id: \"' + string + '\"\n```'
+        query = { "_field": "description", "_value": full_description }
+
         range = 'all'
         sort = []
         response = self.theHiveApi.find_cases(query=query, range=range, sort=sort)
@@ -92,11 +97,11 @@ class TheHiveConnector:
         return updatedCase
 
     def craftCommTask(self):
+        ownercfg=self.cfg.get('TheHive', 'owner')
         self.logger.info('%s.craftCommTask starts', __name__)
-
         commTask = CaseTask(title='Communication',
             status='InProgress',
-            owner='synapse')
+            owner=ownercfg)
 
         return commTask
 
@@ -104,7 +109,6 @@ class TheHiveConnector:
         self.logger.info('%s.createTask starts', __name__)
 
         response = self.theHiveApi.create_case_task(esCaseId, task)
-
         if response.status_code == 201:
             esCreatedTaskId = response.json()['id']
             return esCreatedTaskId
@@ -164,7 +168,7 @@ class TheHiveConnector:
             esCaseId, file_observable)
 
         if response.status_code == 201:
-            esObservableId = response.json()['id']
+            esObservableId = response.json()[0]['id']
             return esObservableId
         else:
             self.logger.error('File observable upload failed')
